@@ -1,0 +1,61 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
+      MONGO_DB: ${MONGO_DB:-zero_trust_gateway}
+      JWT_SECRET: ${JWT_SECRET:-local-demo-secret-change-before-deployment}
+      TOKEN_REFERENCE_KEY: ${TOKEN_REFERENCE_KEY:-local-demo-token-reference-key-change-before-deploy}
+      IDENTITY_HASH_KEY: ${IDENTITY_HASH_KEY:-local-demo-identity-hash-key-change-before-deploy}
+      BEHAVIOR_CLASSIFIER_PATH: ${BEHAVIOR_CLASSIFIER_PATH:-}
+      DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-admin-demo-password}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-alice-demo-password}
+      DEFAULT_POLICY_MODE: enforce
+      EVENT_RETENTION_DAYS: 30
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  dashboard:
+    build: ./frontend
+    environment:
+      API_URL: ""
+      AUTH_MODE: demo
+      OIDC_AUTHORITY: ""
+      OIDC_CLIENT_ID: ""
+    ports:
+      - "5173:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health/live"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  mongo_data:

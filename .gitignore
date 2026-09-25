@@ -1,0 +1,8 @@
+.env
+__pycache__/
+*.py[cod]
+.venv/
+node_modules/
+frontend/dist/
+ml/dataset/*.csv
+ml/models/*.joblib
